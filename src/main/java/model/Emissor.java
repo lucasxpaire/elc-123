@@ -12,27 +12,27 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Emissor {
-    // --- Configurações do Protocolo ---
+    // Configurações do Protocolo
     private static final int BITS_PARA_NUMERO_DE_SEQUENCIA = 3;
     private static final int NUM_MAX_SEQ = (int) Math.pow(2, BITS_PARA_NUMERO_DE_SEQUENCIA);
     private static final int TAMANHO_JANELA = NUM_MAX_SEQ - 1;
     private static final int TIMEOUT_MS = 3000;
     private static final int TAMANHO_BUFFER_ACK = 1024;
 
-    // --- Endereçamento ---
+    // Endereçamento
     private static final byte ENDERECO_EMISSOR = 1;
     private static final byte ENDERECO_RECEPTOR = 2;
 
-    // --- Estado do Protocolo ---
+    // Estado do Protocolo
     private int baseDaJanela;                  // Sf: Início da janela (número do quadro mais antigo não confirmado).
     private int proximoNumeroDeSequencia;      // Sn: Próximo número de sequência a ser usado.
     private final Lock janelaLock = new ReentrantLock(); // Trava para acesso seguro à janela.
 
-    // --- Estruturas de Dados ---
+    // Estruturas de Dados
     private final List<Quadro> janelaDeEnvio; // Buffer para os quadros enviados mas não confirmados.
     private final Timer[] timers;             // Um timer para cada número de sequência.
 
-    // --- Componentes de Rede ---
+    // Componentes de Rede
     private DatagramSocket socket;
     private InetAddress ipDestino;
     private int portaDestino;
@@ -40,8 +40,6 @@ public class Emissor {
     public Emissor(InetAddress ipDestino, int portaDestino) {
         this.ipDestino = ipDestino;
         this.portaDestino = portaDestino;
-
-        // Inicializa o estado do protocolo
         this.baseDaJanela = 0;
         this.proximoNumeroDeSequencia = 0;
         this.janelaDeEnvio = new ArrayList<>();
@@ -55,7 +53,6 @@ public class Emissor {
         while (baseDaJanela < mensagens.size()) {
             janelaLock.lock();
             try {
-                // Envia novos quadros enquanto a janela tiver espaço e houver mensagens
                 if (proximoNumeroDeSequencia < baseDaJanela + TAMANHO_JANELA && proximoNumeroDeSequencia < mensagens.size()) {
                     enviarNovoQuadro(mensagens.get(proximoNumeroDeSequencia));
                 }
@@ -118,7 +115,7 @@ public class Emissor {
         try {
             System.out.println("\nEMISSOR: Recebeu ACK " + ackNum + ". Base atual: " + (baseDaJanela % NUM_MAX_SEQ));
 
-            if (verificarACKDentroDaJanela(ackNum)) {
+            if (verificarACKEstaDentroDaJanela(ackNum)) {
                 // Desliza a base da janela até o número de sequência do ACK
                 while ((baseDaJanela % NUM_MAX_SEQ) != ackNum) {
                     pararTimer(baseDaJanela % NUM_MAX_SEQ);
@@ -136,11 +133,7 @@ public class Emissor {
         }
     }
 
-    /**
-     * Verifica se um número de ACK recebido está dentro da janela de envio atual,
-     * tratando corretamente o caso de "wrap-around" dos números de sequência.
-     */
-    private boolean verificarACKDentroDaJanela(int ackNum) {
+    private boolean verificarACKEstaDentroDaJanela(int ackNum) {
         int baseSeq = baseDaJanela % NUM_MAX_SEQ;
         int proximoSeq = proximoNumeroDeSequencia % NUM_MAX_SEQ;
 
@@ -154,9 +147,6 @@ public class Emissor {
         }
     }
 
-    /**
-     * Lida com o evento de timeout, reenviando todos os quadros na janela.
-     */
     private void lidarComTimeOut() {
         janelaLock.lock();
         try {
@@ -174,9 +164,6 @@ public class Emissor {
         }
     }
 
-    /**
-     * Envia um quadro pela rede usando o socket.
-     */
     private void enviarParaRede(Quadro quadro) {
         try {
             byte[] dadosDoQuadro = quadro.montarQuadroParaTransmissao();
@@ -188,7 +175,7 @@ public class Emissor {
     }
 
     private void iniciarTimer(int seqNum) {
-        pararTimer(seqNum); // Garante que não há um timer antigo rodando
+        pararTimer(seqNum);
         timers[seqNum] = new Timer(true);
         timers[seqNum].schedule(new TimerTask() {
             @Override
