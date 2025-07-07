@@ -13,6 +13,8 @@ public class Quadro {
     public static final byte TIPO_DADOS = 0x01;
     public static final byte TIPO_CONFIRMACAO = 0x02;   // ACK
 
+    private static final int TAMANHO_CRC = 1;
+
     private byte origem;
     private byte destino;
     private byte numeroSequencia;
@@ -27,7 +29,7 @@ public class Quadro {
         this.numeroSequencia = numeroSequencia;
         this.tipo = tipo;
         this.dados = dados;
-        this.crc = new byte[0]; // CRC inicial vazio
+        this.crc = new byte[TAMANHO_CRC];
     }
 
     // Construtor para recriar um quadro a partir de bytes (após unstuffing e parse)
@@ -172,22 +174,34 @@ public class Quadro {
         return converterBitSetParaByte(saidaBits, saidaIndex);
     }
 
+    /*
+    Monta o quadro completo, com o calculo do CRC, bit stuffing e flags
+     */
     public byte[] montarQuadroParaTransmissao() throws IOException {
-        ByteArrayOutputStream conteudoInternoBruto = new ByteArrayOutputStream();
+        ByteArrayOutputStream conteudoParaCrc = new ByteArrayOutputStream();
 
         // Cabeçalho (origem, destino, sequencia, tipo, tamanhoDados)
-        conteudoInternoBruto.write(origem);
-        conteudoInternoBruto.write(destino);
-        conteudoInternoBruto.write(numeroSequencia);
-        conteudoInternoBruto.write(tipo);
-        conteudoInternoBruto.write((byte) dados.length);
+        conteudoParaCrc.write(origem);
+        conteudoParaCrc.write(destino);
+        conteudoParaCrc.write(numeroSequencia);
+        conteudoParaCrc.write(tipo);
+        conteudoParaCrc.write((byte) dados.length);
+        conteudoParaCrc.write(dados);
 
-        // Dados e CRC (alguém tem que fazer...)
-        conteudoInternoBruto.write(dados);
-        conteudoInternoBruto.write(crc);
+        // Aplica Crc
+        byte crcCalculado = CRC.calcularCrc(conteudoParaCrc.toByteArray());
+        this.crc = new byte[]{crcCalculado};
 
+        // Monta o conteudo (cabecalho + dados + crc)
+        ByteArrayOutputStream conteudoInternoBruto = new ByteArrayOutputStream();
+        conteudoInternoBruto.write(conteudoParaCrc.toByteArray());
+        conteudoInternoBruto.write(this.crc);
+        conteudoParaCrc.write(crc);
+
+        // Aplica bit stuffing
         byte[] conteudoStuffed = aplicarBitStuffing(conteudoInternoBruto.toByteArray());
 
+        // Adiciona flags inicio e fim
         ByteArrayOutputStream quadroCompleto = new ByteArrayOutputStream();
         quadroCompleto.write(FLAG_BYTE);
         quadroCompleto.write(conteudoStuffed);
@@ -196,22 +210,30 @@ public class Quadro {
         return quadroCompleto.toByteArray();
     }
 
+    /*
+    Reconstróio um quadrado, verificando flags, removendo bit stuffing e validando o CRC
+     */
     public static Quadro reconstruirQuadro(byte[] quadroRecebido) throws IOException {
-        if (quadroRecebido == null || quadroRecebido.length < 7) {
-            System.err.println("Quadro muito curto para ser válido. Tamanho: " + (quadroRecebido != null ? quadroRecebido.length : "null"));
+        if (quadroRecebido == null || quadroRecebido.length < 3) {
+            System.err.println("Erro: Quadro recebido é muito curto ou nulo.");
             return null;
         }
 
         if (quadroRecebido[0] != FLAG_BYTE || quadroRecebido[quadroRecebido.length - 1] != FLAG_BYTE) {
-            System.err.println("Flags de início/fim ausentes ou incorretos. Início: " + String.format("%02X", quadroRecebido[0]) + ", Fim: " + String.format("%02X", quadroRecebido[quadroRecebido.length - 1]));
+            System.err.println("Erro: Flags de início/fim do quadro ausentes ou incorretas.");
             return null;
         }
 
         byte[] conteudoStuffed = Arrays.copyOfRange(quadroRecebido, 1, quadroRecebido.length - 1);
         byte[] conteudoUnstuffed = removerBitStuffing(conteudoStuffed);
 
-        if (conteudoUnstuffed.length < 5) {
-            System.err.println("Conteúdo unstuffed muito curto para o cabeçalho. Tamanho: " + conteudoUnstuffed.length);
+        if (!CRC.verificarCRC(conteudoUnstuffed)) {
+            System.err.println("Erro: Falha na verificação do CRC. O quadro está corrompido.");
+            return null;
+        }
+
+        if (conteudoUnstuffed.length < 5 + TAMANHO_CRC) {
+            System.err.println("Erro: Conteúdo do quadro (após unstuffing) muito curto.");
             return null;
         }
 
@@ -221,15 +243,14 @@ public class Quadro {
         byte tipo = conteudoUnstuffed[3];
         int tamanhoDadosBrutos = Byte.toUnsignedInt(conteudoUnstuffed[4]);
 
-        if (5 + tamanhoDadosBrutos > conteudoUnstuffed.length) {
+        int fimDados = 5 + tamanhoDadosBrutos;
+        if (fimDados > conteudoUnstuffed.length) {
             System.err.println("Tamanho de dados declarado não corresponde ao quadro. Tamanho declarado: " + tamanhoDadosBrutos + ", Conteúdo unstuffed: " + conteudoUnstuffed.length);
             return null;
         }
 
         byte[] dadosExtraidos = Arrays.copyOfRange(conteudoUnstuffed, 5, 5 + tamanhoDadosBrutos);
-        byte[] crcExtraido = new byte[0];
-
-        // fazer a parte do crc
+        byte[] crcExtraido = Arrays.copyOfRange(conteudoUnstuffed, fimDados, fimDados + TAMANHO_CRC);
 
         return new Quadro(origem, destino, numeroSequencia, tipo, dadosExtraidos, crcExtraido);
     }
