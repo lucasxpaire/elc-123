@@ -59,7 +59,7 @@ public class Receptor {
     }
 
     private void processarPacoteRecebido(DatagramPacket pacote) throws IOException {
-        if (random.nextDouble() < 1.0) {
+        if (random.nextDouble() < 0.05) { // 5% de chance de simular perda de pacote
             System.err.println("RECEPTOR: SIMULANDO PERDA DE PACOTE");
             return;
         }

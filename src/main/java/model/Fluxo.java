@@ -9,7 +9,9 @@ public class Fluxo {
         InetAddress ipDestino = InetAddress.getByName("127.0.0.1");
         int portaDestino = 5000;
         Random rand = new Random();
-        DatagramSocket socket = new DatagramSocket();
+
+        int portaLocalEmissor = 6000; 
+        DatagramSocket socket = new DatagramSocket(portaLocalEmissor);
         Emissor emissor = new Emissor(ipDestino, portaDestino);
 
         while (true) {
@@ -17,21 +19,25 @@ public class Fluxo {
             byte[] dados = new byte[tamanho];
             rand.nextBytes(dados);
 
-            boolean inserirErro = rand.nextDouble() < 0.2;
-            if (inserirErro) {
-                int byteIdx = rand.nextInt(tamanho);
-                int bitIdx = rand.nextInt(8);
-                dados[byteIdx] ^= (1 << bitIdx);
-                System.out.println("Fluxo: Mensagem gerada com ERRO proposital.");
-            } else {
-                System.out.println("Fluxo: Mensagem gerada CORRETA.");
-            }
+            boolean inserirErro = rand.nextDouble() < 0.5; // 50% de chance de erro
 
-            emissor.iniciarProcessoDeEnvioBytes(
-                java.util.Collections.singletonList(dados), socket
-            );
+            if (inserirErro) {
+                emissor.enviarMensagemCorrompida(socket);
+            } else {
+                // Envio correto com CRC anexado
+                byte crc = CRC.calcularCrc(dados);
+                byte[] dadosComCrc = new byte[tamanho + 1];
+                System.arraycopy(dados, 0, dadosComCrc, 0, tamanho);
+                dadosComCrc[tamanho] = crc;
+
+                System.out.println("Fluxo: Mensagem gerada CORRETA.");
+                emissor.iniciarProcessoDeEnvioBytes(
+                    java.util.Collections.singletonList(dadosComCrc), socket
+                );
+            }
 
             Thread.sleep(5000);
         }
+
     }
 }

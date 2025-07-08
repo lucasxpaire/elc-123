@@ -257,13 +257,14 @@ public class Quadro {
         }
 
         byte[] conteudoStuffed = Arrays.copyOfRange(quadroRecebido, 1, quadroRecebido.length - 1);
-        byte[] conteudoUnstuffed = removerBitStuffing(conteudoStuffed);
-
-        if (!CRC.verificarCRC(conteudoUnstuffed)) {
+        
+        if (!CRC.verificarCRC(conteudoStuffed)) {
             System.err.println("Erro: Falha na verificação do CRC. O quadro está corrompido.");
             return null;
         }
-
+        
+        byte[] conteudoUnstuffed = removerBitStuffing(conteudoStuffed);
+        
         if (conteudoUnstuffed.length < 5 + TAMANHO_CRC) {
             System.err.println("Erro: Conteúdo do quadro (após unstuffing) muito curto.");
             return null;
@@ -276,10 +277,11 @@ public class Quadro {
         int tamanhoDadosBrutos = Byte.toUnsignedInt(conteudoUnstuffed[4]);
 
         int fimDados = 5 + tamanhoDadosBrutos;
-        if (fimDados > conteudoUnstuffed.length) {
-            System.err.println("Tamanho de dados declarado não corresponde ao quadro. Tamanho declarado: " + tamanhoDadosBrutos + ", Conteúdo unstuffed: " + conteudoUnstuffed.length);
+        if (fimDados + TAMANHO_CRC > conteudoUnstuffed.length) {
+            System.err.println("Quadro incompleto para dados + CRC.");
             return null;
         }
+
 
         byte[] dadosExtraidos = Arrays.copyOfRange(conteudoUnstuffed, 5, 5 + tamanhoDadosBrutos);
         byte[] crcExtraido = Arrays.copyOfRange(conteudoUnstuffed, fimDados, fimDados + TAMANHO_CRC);

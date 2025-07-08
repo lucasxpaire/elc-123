@@ -59,7 +59,38 @@ public class Emissor {
         }
     }
 
-    // No Emissor.java
+
+    public void enviarMensagemCorrompida(DatagramSocket socket) {
+        try {
+            this.socket = socket; // <<< esta linha resolve o erro
+
+            byte[] dadosOriginais = new byte[3]; // Exemplo: 3 bytes aleatórios
+            new java.util.Random().nextBytes(dadosOriginais);
+
+            // Calcular e anexar o CRC
+            byte crc = CRC.calcularCrc(dadosOriginais);
+            byte[] dadosComCrc = new byte[dadosOriginais.length + 1];
+            System.arraycopy(dadosOriginais, 0, dadosComCrc, 0, dadosOriginais.length);
+            dadosComCrc[dadosOriginais.length] = crc;
+
+            // Corromper um bit aleatório
+            int byteIndex = new java.util.Random().nextInt(dadosComCrc.length);
+            int bitIndex = new java.util.Random().nextInt(8);
+            dadosComCrc[byteIndex] ^= (1 << bitIndex);
+
+            System.out.println("EMISSOR: Enviando mensagem **CORROMPIDA** (bit alterado em [" + byteIndex + "], bit " + bitIndex + ")");
+
+            byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);
+            Quadro quadro = new Quadro(ENDERECO_EMISSOR, ENDERECO_RECEPTOR, seqNum, Quadro.TIPO_DADOS, dadosComCrc);
+
+            enviarParaRede(quadro);
+
+        } catch (Exception e) {
+            System.err.println("Erro ao enviar mensagem corrompida: " + e.getMessage());
+        }
+    }
+
+
     public void iniciarProcessoDeEnvioBytes(List<byte[]> mensagens, DatagramSocket socket) {
         this.socket = socket;
         //resetarEstado();
@@ -185,6 +216,7 @@ public class Emissor {
 
             if (verificarACKEstaDentroDaJanela(ackNum)) {
                 while ((baseDaJanela % NUM_MAX_SEQ) != ackNum) {
+                    System.out.println("EMISSOR: Confirmando quadro seqNum " + (baseDaJanela % NUM_MAX_SEQ));
                     pararTimer(baseDaJanela % NUM_MAX_SEQ);
                     if (!janelaDeEnvio.isEmpty()) {
                         janelaDeEnvio.remove(0);
