@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.Random;
 
 public class Receptor {
     // Configurações do Protocolo
@@ -22,11 +23,13 @@ public class Receptor {
     private DatagramSocket socket;
     private InetAddress ipEmissor;
     private int portaEmissor;
-
+    
+    private static final Random random = new Random();
+    
     public Receptor() {
         this.proximoNumeroEsperado = 0;
     }
-
+    
     /**
      * Inicia o processo de escuta e recebimento de quadros.
      */
@@ -56,6 +59,11 @@ public class Receptor {
     }
 
     private void processarPacoteRecebido(DatagramPacket pacote) throws IOException {
+        if (random.nextDouble() < 1.0) {
+            System.err.println("RECEPTOR: SIMULANDO PERDA DE PACOTE");
+            return;
+        }
+        
         byte[] dadosRecebidos = new byte[pacote.getLength()];
         System.arraycopy(pacote.getData(), pacote.getOffset(), dadosRecebidos, 0, pacote.getLength());
 
@@ -80,6 +88,7 @@ public class Receptor {
             enviarAck(proximoNumeroEsperado);
         }
     }
+
 
     private void enviarAck(int ackNum) {
         Quadro quadroAck = new Quadro(ENDERECO_RECEPTOR, ENDERECO_EMISSOR, (byte) ackNum, Quadro.TIPO_CONFIRMACAO, new byte[0]);
