@@ -228,7 +228,7 @@ public class Quadro {
         ByteArrayOutputStream conteudoInternoBruto = new ByteArrayOutputStream();
         conteudoInternoBruto.write(conteudoParaCrc.toByteArray());
         conteudoInternoBruto.write(this.crc);
-        conteudoParaCrc.write(crc);
+            conteudoParaCrc.write(crc);
 
         // Aplica bit stuffing
         byte[] conteudoStuffed = aplicarBitStuffing(conteudoInternoBruto.toByteArray());

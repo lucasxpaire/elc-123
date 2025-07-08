@@ -9,11 +9,10 @@ public class Fluxo {
         InetAddress ipDestino = InetAddress.getByName("127.0.0.1");
         int portaDestino = 5000;
         Random rand = new Random();
+        DatagramSocket socket = new DatagramSocket();
+        Emissor emissor = new Emissor(ipDestino, portaDestino);
 
         while (true) {
-            DatagramSocket socket = new DatagramSocket();
-            Emissor emissor = new Emissor(ipDestino, portaDestino);
-
             int tamanho = 1 + rand.nextInt(4); // 1 a 4 bytes
             byte[] dados = new byte[tamanho];
             rand.nextBytes(dados);
@@ -32,7 +31,6 @@ public class Fluxo {
                 java.util.Collections.singletonList(dados), socket
             );
 
-            socket.close();
             Thread.sleep(5000);
         }
     }

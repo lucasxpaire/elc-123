@@ -116,12 +116,12 @@ public class Emissor {
                 janelaLock.unlock();
             }
 
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                System.err.println("Thread principal do emissor foi interrompida.");
-            }
+//            try {
+//                Thread.sleep(100);
+//            } catch (InterruptedException e) {
+//                Thread.currentThread().interrupt();
+//                System.err.println("Thread principal do emissor foi interrompida.");
+//            }
         }
 
         if (houveFalha) {
@@ -132,7 +132,7 @@ public class Emissor {
     }
 
     private void enviarNovoQuadro(String dados) {
-        byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);
+        byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);  // ciclico
         Quadro quadro = new Quadro(ENDERECO_EMISSOR, ENDERECO_RECEPTOR, seqNum, Quadro.TIPO_DADOS, dados.getBytes());
 
         tentativasPorSeqNum[seqNum] = 0;
@@ -144,6 +144,7 @@ public class Emissor {
         proximoNumeroDeSequencia++;
     }
 
+    // Em Emissor.java
     private void iniciarEscutaDeACKS() {
         Thread ackListenerThread = new Thread(() -> {
             try {
@@ -152,9 +153,19 @@ public class Emissor {
                     DatagramPacket pacoteRecebido = new DatagramPacket(buffer, buffer.length);
                     socket.receive(pacoteRecebido);
 
-                    Quadro quadroAck = Quadro.reconstruirQuadro(pacoteRecebido.getData());
+                    // ---- INÍCIO DA CORREÇÃO ----
+                    // Crie um novo array com o tamanho exato dos dados do ACK recebido
+                    byte[] dadosRecebidos = new byte[pacoteRecebido.getLength()];
+                    System.arraycopy(pacoteRecebido.getData(), pacoteRecebido.getOffset(), dadosRecebidos, 0, pacoteRecebido.getLength());
+
+                    // Agora reconstrua o quadro de ACK usando o array de tamanho correto
+                    Quadro quadroAck = Quadro.reconstruirQuadro(dadosRecebidos);
+                    // ---- FIM DA CORREÇÃO ----
+
                     if (quadroAck != null && quadroAck.getTipo() == Quadro.TIPO_CONFIRMACAO) {
                         processarACK(quadroAck.getNumeroSequencia());
+                    } else if (quadroAck == null) {
+                        System.err.println("EMISSOR: Pacote de ACK recebido corrompido ou mal formado. Descartando.");
                     }
                 }
             } catch (IOException e) {

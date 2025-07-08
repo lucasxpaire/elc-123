@@ -56,7 +56,10 @@ public class Receptor {
     }
 
     private void processarPacoteRecebido(DatagramPacket pacote) throws IOException {
-        Quadro quadro = Quadro.reconstruirQuadro(pacote.getData());
+        byte[] dadosRecebidos = new byte[pacote.getLength()];
+        System.arraycopy(pacote.getData(), pacote.getOffset(), dadosRecebidos, 0, pacote.getLength());
+
+        Quadro quadro = Quadro.reconstruirQuadro(dadosRecebidos);
 
         if (quadro == null) {
             System.err.println("RECEPTOR: Quadro recebido corrompido ou mal formado. Descartando.");
@@ -66,8 +69,8 @@ public class Receptor {
         System.out.println("RECEPTOR: Recebeu quadro com SeqNum: " + quadro.getNumeroSequencia() + ". Esperando por: " + proximoNumeroEsperado);
 
         if (quadro.getNumeroSequencia() == proximoNumeroEsperado) {
-            String dadosRecebidos = new String(quadro.getDados());
-            System.out.println("RECEPTOR: Quadro aceito. Dados: \"" + dadosRecebidos + "\"");
+            //String dadosRecebidos = new String(quadro.getDados());
+            System.out.println("RECEPTOR: Quadro aceito. Dados: \"" + quadro.getDados().length + "\"");
 
             proximoNumeroEsperado = (proximoNumeroEsperado + 1) % NUM_MAX_SEQ;
 
