@@ -186,14 +186,14 @@ public class Emissor {
                     DatagramPacket pacoteRecebido = new DatagramPacket(buffer, buffer.length);
                     socket.receive(pacoteRecebido);
 
-                    // ---- INÍCIO DA CORREÇÃO ----
+                 
                     // Crie um novo array com o tamanho exato dos dados do ACK recebido
                     byte[] dadosRecebidos = new byte[pacoteRecebido.getLength()];
                     System.arraycopy(pacoteRecebido.getData(), pacoteRecebido.getOffset(), dadosRecebidos, 0, pacoteRecebido.getLength());
 
                     // Agora reconstrua o quadro de ACK usando o array de tamanho correto
                     Quadro quadroAck = Quadro.reconstruirQuadro(dadosRecebidos);
-                    // ---- FIM DA CORREÇÃO ----
+
 
                     if (quadroAck != null && quadroAck.getTipo() == Quadro.TIPO_CONFIRMACAO) {
                         processarACK(quadroAck.getNumeroSequencia());

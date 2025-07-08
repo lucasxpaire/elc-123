@@ -1,9 +1,6 @@
 package model;
 
 import java.util.Random;
-import static model.Quadro.aplicarBitStuffing;
-import static model.Quadro.removerBitStuffing;
-import model.CRC;
 
 public class ErrorSimulation {
     static Random random = new Random();

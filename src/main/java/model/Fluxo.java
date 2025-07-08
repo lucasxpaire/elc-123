@@ -21,7 +21,7 @@ public class Fluxo {
                 List<byte[]> listaDeMensagens = new ArrayList<>();
 
                 for (int i = 0; i < quantidadeDeQuadros; i++) {
-                    int tamanho = 1 + rand.nextInt(4);
+                    int tamanho = 1 + rand.nextInt(4); // de 1 a 4 bytes
                     byte[] dados = new byte[tamanho];
                     rand.nextBytes(dados);
 
@@ -56,7 +56,7 @@ public class Fluxo {
                 System.out.println("Fluxo: Enviando " + quantidadeDeQuadros + " quadros.");
                 emissor.iniciarProcessoDeEnvioBytes(listaDeMensagens, socket);
 
-                // Fecha o socket explicitamente (opcional, try-with-resources já faz isso)
+                // Fecha o socket explicitamente 
                 socket.close();
 
             } catch (Exception e) {
