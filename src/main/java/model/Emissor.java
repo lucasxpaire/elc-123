@@ -12,30 +12,30 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Emissor {
-    // Configurações do Protocolo
     private static final int BITS_PARA_NUMERO_DE_SEQUENCIA = 3;
     private static final int NUM_MAX_SEQ = (int) Math.pow(2, BITS_PARA_NUMERO_DE_SEQUENCIA);
     private static final int TAMANHO_JANELA = NUM_MAX_SEQ - 1;
     private static final int TIMEOUT_MS = 3000;
     private static final int TAMANHO_BUFFER_ACK = 1024;
 
-    // Endereçamento
     private static final byte ENDERECO_EMISSOR = 1;
     private static final byte ENDERECO_RECEPTOR = 2;
 
-    // Estado do Protocolo
-    private int baseDaJanela;                  // Sf: Início da janela (número do quadro mais antigo não confirmado).
-    private int proximoNumeroDeSequencia;      // Sn: Próximo número de sequência a ser usado.
-    private final Lock janelaLock = new ReentrantLock(); // Trava para acesso seguro à janela.
+    private int baseDaJanela;
+    private int proximoNumeroDeSequencia;
+    private final Lock janelaLock = new ReentrantLock();
 
-    // Estruturas de Dados
-    private final List<Quadro> janelaDeEnvio; // Buffer para os quadros enviados mas não confirmados.
-    private final Timer[] timers;             // Um timer para cada número de sequência.
+    private final List<Quadro> janelaDeEnvio;
+    private final Timer[] timers;
 
-    // Componentes de Rede
     private DatagramSocket socket;
     private InetAddress ipDestino;
     private int portaDestino;
+
+    private static final int MAX_TENTATIVAS = 3;
+    private final int[] tentativasPorSeqNum = new int[NUM_MAX_SEQ];
+
+    private boolean houveFalha = false;
 
     public Emissor(InetAddress ipDestino, int portaDestino) {
         this.ipDestino = ipDestino;
@@ -46,14 +46,70 @@ public class Emissor {
         this.timers = new Timer[NUM_MAX_SEQ];
     }
 
-    public void iniciarProcessoDeEnvio(List<String> mensagens, DatagramSocket socket) {
+
+    private void resetarEstado() {
+        baseDaJanela = 0;
+        proximoNumeroDeSequencia = 0;
+        janelaDeEnvio.clear();
+        houveFalha = false;
+
+        for (int i = 0; i < NUM_MAX_SEQ; i++) {
+            tentativasPorSeqNum[i] = 0;
+            pararTimer(i);
+        }
+    }
+
+    // No Emissor.java
+    public void iniciarProcessoDeEnvioBytes(List<byte[]> mensagens, DatagramSocket socket) {
         this.socket = socket;
+        resetarEstado();
         iniciarEscutaDeACKS();
 
         while (baseDaJanela < mensagens.size()) {
             janelaLock.lock();
             try {
-                if (proximoNumeroDeSequencia < baseDaJanela + TAMANHO_JANELA && proximoNumeroDeSequencia < mensagens.size()) {
+                if (proximoNumeroDeSequencia < baseDaJanela + TAMANHO_JANELA &&
+                    proximoNumeroDeSequencia < mensagens.size()) {
+                    enviarNovoQuadroBytes(mensagens.get(proximoNumeroDeSequencia));
+                }
+            } finally {
+                janelaLock.unlock();
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (houveFalha) {
+            System.out.println("\n\nAlguma mensagem FALHOU após o número máximo de tentativas. Processo encerrado.\n");
+        } else {
+            System.out.println("\n\nTodas as mensagens foram enviadas e confirmadas. Processo encerrado.\n");
+        }
+    }
+
+    private void enviarNovoQuadroBytes(byte[] dados) {
+        byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);
+        Quadro quadro = new Quadro(ENDERECO_EMISSOR, ENDERECO_RECEPTOR, seqNum, Quadro.TIPO_DADOS, dados);
+        tentativasPorSeqNum[seqNum] = 0;
+        janelaDeEnvio.add(quadro);
+        System.out.println("EMISSOR: Enviando quadro com SeqNum: " + seqNum);
+        enviarParaRede(quadro);
+        iniciarTimer(seqNum);
+        proximoNumeroDeSequencia++;
+    }
+
+     public void iniciarProcessoDeEnvio(List<String> mensagens, DatagramSocket socket) {
+        this.socket = socket;
+        resetarEstado(); // <-- corrigido
+
+        iniciarEscutaDeACKS();
+
+        while (baseDaJanela < mensagens.size()) {
+            janelaLock.lock();
+            try {
+                if (proximoNumeroDeSequencia < baseDaJanela + TAMANHO_JANELA &&
+                    proximoNumeroDeSequencia < mensagens.size()) {
                     enviarNovoQuadro(mensagens.get(proximoNumeroDeSequencia));
                 }
             } finally {
@@ -67,12 +123,19 @@ public class Emissor {
                 System.err.println("Thread principal do emissor foi interrompida.");
             }
         }
-        System.out.println("\nTodas as mensagens foram enviadas e confirmadas. Processo encerrado.");
+
+        if (houveFalha) {
+            System.out.println("\n\nAlguma mensagem FALHOU após o número máximo de tentativas. Processo encerrado.\n");
+        } else {
+            System.out.println("\n\nTodas as mensagens foram enviadas e confirmadas. Processo encerrado.\n");
+        }
     }
 
     private void enviarNovoQuadro(String dados) {
         byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);
         Quadro quadro = new Quadro(ENDERECO_EMISSOR, ENDERECO_RECEPTOR, seqNum, Quadro.TIPO_DADOS, dados.getBytes());
+
+        tentativasPorSeqNum[seqNum] = 0;
 
         janelaDeEnvio.add(quadro);
         System.out.println("EMISSOR: Enviando quadro com SeqNum: " + seqNum);
@@ -81,9 +144,6 @@ public class Emissor {
         proximoNumeroDeSequencia++;
     }
 
-    /**
-     * Inicia uma thread para escutar por pacotes de ACK vindos do receptor.
-     */
     private void iniciarEscutaDeACKS() {
         Thread ackListenerThread = new Thread(() -> {
             try {
@@ -107,16 +167,12 @@ public class Emissor {
         ackListenerThread.start();
     }
 
-    /**
-     * Processa um ACK recebido, deslizando a janela de envio se o ACK for válido.
-     */
     private void processarACK(int ackNum) {
         janelaLock.lock();
         try {
             System.out.println("\nEMISSOR: Recebeu ACK " + ackNum + ". Base atual: " + (baseDaJanela % NUM_MAX_SEQ));
 
             if (verificarACKEstaDentroDaJanela(ackNum)) {
-                // Desliza a base da janela até o número de sequência do ACK
                 while ((baseDaJanela % NUM_MAX_SEQ) != ackNum) {
                     pararTimer(baseDaJanela % NUM_MAX_SEQ);
                     if (!janelaDeEnvio.isEmpty()) {
@@ -137,12 +193,9 @@ public class Emissor {
         int baseSeq = baseDaJanela % NUM_MAX_SEQ;
         int proximoSeq = proximoNumeroDeSequencia % NUM_MAX_SEQ;
 
-        // Caso normal (ex: base=2, proximo=5, janela=[2,3,4]). ACKs válidos: 3, 4, 5.
         if (baseSeq < proximoSeq) {
             return ackNum > baseSeq && ackNum <= proximoSeq;
-        }
-        // Caso com "wrap-around" (ex: base=6, proximo=2, janela=[6,7,0,1]). ACKs válidos: 7, 0, 1, 2.
-        else {
+        } else {
             return ackNum > baseSeq || ackNum <= proximoSeq;
         }
     }
@@ -151,11 +204,25 @@ public class Emissor {
         janelaLock.lock();
         try {
             System.err.println("\nTIMEOUT! Reenviando toda a janela a partir da base: " + (baseDaJanela % NUM_MAX_SEQ) + "\n");
-            // Go-Back-N: Reenvia todos os quadros da janela.
             for (int i = 0; i < janelaDeEnvio.size(); i++) {
                 Quadro quadroParaReenviar = janelaDeEnvio.get(i);
                 int seqNumNoQuadro = (baseDaJanela + i) % NUM_MAX_SEQ;
-                System.err.println("EMISSOR (REENVIO): Enviando quadro com SeqNum: " + seqNumNoQuadro);
+
+                tentativasPorSeqNum[seqNumNoQuadro]++;
+                if (tentativasPorSeqNum[seqNumNoQuadro] > MAX_TENTATIVAS) {
+                    System.err.println("EMISSOR: Número máximo de tentativas atingido para SeqNum " + seqNumNoQuadro + ". Desistindo do envio.");
+                    pararTimer(seqNumNoQuadro);
+                    tentativasPorSeqNum[seqNumNoQuadro] = 0;
+                    if (!janelaDeEnvio.isEmpty()) {
+                        janelaDeEnvio.remove(i);
+                        i--;
+                    }
+                    baseDaJanela++;
+                    houveFalha = true;
+                    continue;
+                }
+
+                System.err.println("EMISSOR (REENVIO): Enviando quadro com SeqNum: " + seqNumNoQuadro + " (Tentativa " + tentativasPorSeqNum[seqNumNoQuadro] + ")");
                 enviarParaRede(quadroParaReenviar);
                 iniciarTimer(seqNumNoQuadro);
             }

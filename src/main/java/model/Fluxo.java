@@ -2,29 +2,38 @@ package model;
 
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.Arrays;
+import java.util.Random;
 
 public class Fluxo {
     public static void main(String[] args) throws Exception {
         InetAddress ipDestino = InetAddress.getByName("127.0.0.1");
         int portaDestino = 5000;
+        Random rand = new Random();
 
-        // Instancia o receptor com lógica completa (ele mesmo cria o socket internamente)
-        Receptor receptor = new Receptor();
-        Thread receptorThread = new Thread(() -> receptor.iniciar(portaDestino));
-        receptorThread.start();
+        while (true) {
+            DatagramSocket socket = new DatagramSocket();
+            Emissor emissor = new Emissor(ipDestino, portaDestino);
 
-        Thread.sleep(500); // garante que o receptor está escutando
+            int tamanho = 1 + rand.nextInt(4); // 1 a 4 bytes
+            byte[] dados = new byte[tamanho];
+            rand.nextBytes(dados);
 
-        // Cria socket do emissor com porta aleatória (ou fixa, se quiser)
-        DatagramSocket socketEmissor = new DatagramSocket();
-        Emissor emissor = new Emissor(ipDestino, portaDestino);
-        var mensagens = Arrays.asList("Mensagem 1", "Mensagem 2", "Mensagem 3");
+            boolean inserirErro = rand.nextDouble() < 0.2;
+            if (inserirErro) {
+                int byteIdx = rand.nextInt(tamanho);
+                int bitIdx = rand.nextInt(8);
+                dados[byteIdx] ^= (1 << bitIdx);
+                System.out.println("Fluxo: Mensagem gerada com ERRO proposital.");
+            } else {
+                System.out.println("Fluxo: Mensagem gerada CORRETA.");
+            }
 
-        // Inicia envio com controle de janela e timeout
-        emissor.iniciarProcessoDeEnvio(mensagens, socketEmissor);
+            emissor.iniciarProcessoDeEnvioBytes(
+                java.util.Collections.singletonList(dados), socket
+            );
 
-        // Espera finalização do receptor (opcional, útil para testes)
-        receptorThread.join();
+            socket.close();
+            Thread.sleep(5000);
+        }
     }
 }

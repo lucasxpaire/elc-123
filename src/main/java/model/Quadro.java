@@ -7,7 +7,8 @@ import java.util.BitSet;
 
 public class Quadro {
     // flag de bit-stuffing
-    public static final byte FLAG_BYTE = (byte) 0x07E;    // 01111110
+    // public static final byte FLAG_BYTE = (byte) 0x07E;    // 01111110
+    public static final byte FLAG_BYTE = (byte) 0x7E;    // 01111110
 
     // Tipos de quadro
     public static final byte TIPO_DADOS = 0x01;
@@ -149,30 +150,61 @@ public class Quadro {
         return converterBitSetParaByte(saidaBits, saidaIndex);
     }
 
+    // public static byte[] removerBitStuffing(byte[] dadosStuffed) {
+    //     BitSet entradaBits = converterByteParaBitSet(dadosStuffed);
+    //     BitSet saidaBits = new BitSet();
+    //     int saidaIndex = 0;
+    //     int contadorDeUns = 0;
+
+    //     for (int i = 0; i < dadosStuffed.length * 8; i++) {
+    //         boolean bitAtual = entradaBits.get(i);
+
+    //         if (contadorDeUns == 5 && !bitAtual) {
+    //             // Bit stuffed detectado (0 após cinco 1s), então pula
+    //             contadorDeUns = 0;
+    //             continue;
+    //         }
+
+    //         saidaBits.set(saidaIndex++, bitAtual);
+
+    //         if (bitAtual) {
+    //             contadorDeUns++;
+    //         } else {
+    //             contadorDeUns = 0;
+    //         }
+    //     }
+
+    //     return converterBitSetParaByte(saidaBits, saidaIndex);
+    // }
+
     public static byte[] removerBitStuffing(byte[] dadosStuffed) {
-        BitSet entradaBits = converterByteParaBitSet(dadosStuffed);
-        BitSet saidaBits = new BitSet();
-        int saidaIndex = 0;
-        int contadorDeUns = 0;
+    BitSet entradaBits = converterByteParaBitSet(dadosStuffed);
+    BitSet saidaBits = new BitSet();
+    int saidaIndex = 0;
+    int contadorDeUns = 0;
 
-        for (int i = 0; i < entradaBits.cardinality() + (dadosStuffed.length*8 - entradaBits.length()); i++) {
-            boolean bitAtual = entradaBits.get(i);
+    int totalBits = dadosStuffed.length * 8;
+    for (int i = 0; i < totalBits; i++) {
+        boolean bitAtual = entradaBits.get(i);
 
-            if (contadorDeUns == 5 && !bitAtual) {
-                contadorDeUns = 0;
-                continue;
-            }
-
-            saidaBits.set(saidaIndex++, bitAtual);
-
-            if (bitAtual) {
-                contadorDeUns++;
-            } else {
-                contadorDeUns = 0;
-            }
+        if (contadorDeUns == 5 && !bitAtual) {
+            // bit stuffed detectado (0 após cinco 1s) — pula esse bit
+            contadorDeUns = 0;
+            continue;
         }
-        return converterBitSetParaByte(saidaBits, saidaIndex);
+
+        saidaBits.set(saidaIndex++, bitAtual);
+
+        if (bitAtual) {
+            contadorDeUns++;
+        } else {
+            contadorDeUns = 0;
+        }
     }
+
+    return converterBitSetParaByte(saidaBits, saidaIndex);
+}
+
 
     /*
     Monta o quadro completo, com o calculo do CRC, bit stuffing e flags
