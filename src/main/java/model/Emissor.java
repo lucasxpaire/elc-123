@@ -99,6 +99,7 @@ public class Emissor {
         while (baseDaJanela < mensagens.size()) {
             janelaLock.lock();
             try {
+                // System.out.println("DEBUG: baseDaJanela=" + baseDaJanela + ", proximoNumeroDeSequencia=" + proximoNumeroDeSequencia);
                 if (proximoNumeroDeSequencia < baseDaJanela + TAMANHO_JANELA &&
                     proximoNumeroDeSequencia < mensagens.size()) {
                     enviarNovoQuadroBytes(mensagens.get(proximoNumeroDeSequencia));
@@ -118,6 +119,7 @@ public class Emissor {
             System.out.println("\n\nTodas as mensagens foram enviadas e confirmadas. Processo encerrado.\n");
         }
     }
+
 
     private void enviarNovoQuadroBytes(byte[] dados) {
         byte seqNum = (byte) (proximoNumeroDeSequencia % NUM_MAX_SEQ);
