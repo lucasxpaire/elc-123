@@ -150,33 +150,6 @@ public class Quadro {
         return converterBitSetParaByte(saidaBits, saidaIndex);
     }
 
-    // public static byte[] removerBitStuffing(byte[] dadosStuffed) {
-    //     BitSet entradaBits = converterByteParaBitSet(dadosStuffed);
-    //     BitSet saidaBits = new BitSet();
-    //     int saidaIndex = 0;
-    //     int contadorDeUns = 0;
-
-    //     for (int i = 0; i < dadosStuffed.length * 8; i++) {
-    //         boolean bitAtual = entradaBits.get(i);
-
-    //         if (contadorDeUns == 5 && !bitAtual) {
-    //             // Bit stuffed detectado (0 após cinco 1s), então pula
-    //             contadorDeUns = 0;
-    //             continue;
-    //         }
-
-    //         saidaBits.set(saidaIndex++, bitAtual);
-
-    //         if (bitAtual) {
-    //             contadorDeUns++;
-    //         } else {
-    //             contadorDeUns = 0;
-    //         }
-    //     }
-
-    //     return converterBitSetParaByte(saidaBits, saidaIndex);
-    // }
-
     public static byte[] removerBitStuffing(byte[] dadosStuffed) {
     BitSet entradaBits = converterByteParaBitSet(dadosStuffed);
     BitSet saidaBits = new BitSet();
