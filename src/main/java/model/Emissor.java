@@ -62,7 +62,7 @@ public class Emissor {
     // No Emissor.java
     public void iniciarProcessoDeEnvioBytes(List<byte[]> mensagens, DatagramSocket socket) {
         this.socket = socket;
-        resetarEstado();
+        //resetarEstado();
         iniciarEscutaDeACKS();
 
         while (baseDaJanela < mensagens.size()) {
